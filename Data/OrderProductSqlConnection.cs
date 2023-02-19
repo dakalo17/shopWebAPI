@@ -27,9 +27,9 @@ namespace shopWebAPI.Data
 						ops.Add(new OrderProduct
 						{
 							Id = Convert.ToInt32(reader["id"]),
-							Order_id = Convert.ToInt32(reader["order_id"]),
+							Fk_Order_Id = Convert.ToInt32(reader["fk_order_id"]),
 							Price = Convert.ToDecimal(reader["price"]),
-							Product_id = Convert.ToInt32(reader["product_id"]),
+							Fk_Product_Id = Convert.ToInt32(reader["fk_product_id"]),
 							Quantity = Convert.ToInt32(reader["quantity"]),
 
 						});
@@ -68,9 +68,9 @@ namespace shopWebAPI.Data
 						ops.Add(new OrderProduct
 						{
 							Id = Convert.ToInt32(reader["id"]),
-							Order_id = Convert.ToInt32(reader["order_id"]),
+							Fk_Order_Id = Convert.ToInt32(reader["fk_order_id"]),
 							Price = Convert.ToDecimal(reader["price"]),
-							Product_id = Convert.ToInt32(reader["product_id"]),
+							Fk_Product_Id = Convert.ToInt32(reader["fk_product_id"]),
 							Quantity = Convert.ToInt32(reader["quantity"]),
 
 						});
@@ -107,9 +107,9 @@ namespace shopWebAPI.Data
 						op=(new OrderProduct
 						{
 							Id = Convert.ToInt32(reader["id"]),
-							Order_id = Convert.ToInt32(reader["order_id"]),
+							Fk_Order_Id = Convert.ToInt32(reader["fk_order_id"]),
 							Price = Convert.ToDecimal(reader["price"]),
-							Product_id = Convert.ToInt32(reader["product_id"]),
+							Fk_Product_Id = Convert.ToInt32(reader["fk_product_id"]),
 							Quantity = Convert.ToInt32(reader["quantity"])
 
 						});
@@ -128,14 +128,14 @@ namespace shopWebAPI.Data
 
 		public async Task<int> Insert(OrderProduct op)
 		{
-			sql = "INSERTED into \"order_product\"(order_id, product_id, quantity, price)" +
+			sql = "INSERTED into \"order_product\"(fk_order_id, fk_product_id, quantity, price)" +
 				"Values(@order_id, @product_id, @quantity, @price)";
 
 			var affectedRows = 0;
 			try {
 				using var cmd = new NpgsqlCommand(sql, _connection);
-				cmd.Parameters.AddWithValue("@order_id",op.Order_id);
-				cmd.Parameters.AddWithValue("@product_id",op.Product_id);
+				cmd.Parameters.AddWithValue("@order_id",op.Fk_Order_Id);
+				cmd.Parameters.AddWithValue("@product_id",op.Fk_Product_Id);
 				cmd.Parameters.AddWithValue("@quantity",op.Quantity);
 				cmd.Parameters.AddWithValue("@price",op.Price);
 				affectedRows = await cmd.ExecuteNonQueryAsync();

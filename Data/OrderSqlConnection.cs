@@ -13,7 +13,7 @@ namespace shopWebAPI.Data
 		public async Task<Order?> Select(int userId)
 		{
 			sql = "SELECT * FROM \"order\" " +
-				"WHERE user_id=@userId";
+				"WHERE fk_user_id=@userId";
 
 
 			Order? order = null;
@@ -33,7 +33,7 @@ namespace shopWebAPI.Data
 						order = new Order
 						{
 							Id = Convert.ToInt32(reader["id"]),
-							User_Id = Convert.ToInt32(reader["user_id"]),
+							Fk_User_Id = Convert.ToInt32(reader["fk_user_id"]),
 							Order_Date = Convert.ToDateTime(reader["order_date"]),
 							Total_Cost = Convert.ToDecimal(reader["total_cost"])
 						};
@@ -67,7 +67,7 @@ namespace shopWebAPI.Data
 					{
 						orders.Add(new Order {
 							Id = Convert.ToInt32(reader["id"]),
-							User_Id = Convert.ToInt32(reader["user_id"]),
+							Fk_User_Id = Convert.ToInt32(reader["fk_user_id"]),
 							Order_Date =Convert.ToDateTime(reader["order_date"]),
 							Total_Cost  = Convert.ToDecimal(reader["total_cost"])
 						});
@@ -83,7 +83,7 @@ namespace shopWebAPI.Data
 		}
 		public async Task<int> Insert(Order order)
 		{
-			sql = "INSERT into \"order\"(user_id, order_date, total_cost) " +
+			sql = "INSERT into \"order\"(fk_user_id, order_date, total_cost) " +
 				"Values(@user_id, @order_date, @total_cost)";
 
 			var affectedRows = 0;
