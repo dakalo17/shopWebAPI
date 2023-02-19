@@ -32,7 +32,7 @@ namespace shopWebAPI.Data
 					{
 						order = new Order
 						{
-							Id = Convert.ToInt32(reader["order_id"]),
+							Id = Convert.ToInt32(reader["id"]),
 							User_Id = Convert.ToInt32(reader["user_id"]),
 							Order_Date = Convert.ToDateTime(reader["order_date"]),
 							Total_Cost = Convert.ToDecimal(reader["total_cost"])
@@ -65,9 +65,9 @@ namespace shopWebAPI.Data
 				{
 					if (reader.HasRows)
 					{
-						orders.Add(new Order { 
+						orders.Add(new Order {
+							Id = Convert.ToInt32(reader["id"]),
 							User_Id = Convert.ToInt32(reader["user_id"]),
-							Id = Convert.ToInt32(reader["order_id"]),
 							Order_Date =Convert.ToDateTime(reader["order_date"]),
 							Total_Cost  = Convert.ToDecimal(reader["total_cost"])
 						});

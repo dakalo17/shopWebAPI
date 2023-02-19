@@ -28,7 +28,7 @@ namespace shopWebAPI.Data
 						{
 							Id = Convert.ToInt32(reader["id"]),
 							Order_id = Convert.ToInt32(reader["order_id"]),
-							Price = Convert.ToDecimal(reader["id"]),
+							Price = Convert.ToDecimal(reader["price"]),
 							Product_id = Convert.ToInt32(reader["product_id"]),
 							Quantity = Convert.ToInt32(reader["quantity"]),
 
@@ -69,7 +69,7 @@ namespace shopWebAPI.Data
 						{
 							Id = Convert.ToInt32(reader["id"]),
 							Order_id = Convert.ToInt32(reader["order_id"]),
-							Price = Convert.ToDecimal(reader["id"]),
+							Price = Convert.ToDecimal(reader["price"]),
 							Product_id = Convert.ToInt32(reader["product_id"]),
 							Quantity = Convert.ToInt32(reader["quantity"]),
 
@@ -108,9 +108,9 @@ namespace shopWebAPI.Data
 						{
 							Id = Convert.ToInt32(reader["id"]),
 							Order_id = Convert.ToInt32(reader["order_id"]),
-							Price = Convert.ToDecimal(reader["id"]),
+							Price = Convert.ToDecimal(reader["price"]),
 							Product_id = Convert.ToInt32(reader["product_id"]),
-							Quantity = Convert.ToInt32(reader["quantity"]),
+							Quantity = Convert.ToInt32(reader["quantity"])
 
 						});
 

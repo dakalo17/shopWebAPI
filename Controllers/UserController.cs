@@ -4,7 +4,7 @@ using shopWebAPI.Models;
 namespace shopWebAPI.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class UserController : ControllerBase
 {
     private readonly string?  _connectionString;
