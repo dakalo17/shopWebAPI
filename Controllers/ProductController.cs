@@ -7,7 +7,7 @@ using static shopWebAPI.Utilities.DatabaseConfigurations;
 
 namespace shopWebAPI.Controllers
 {
-	[Route("[controller]")]
+	[Route("api/[controller]")]
 	[ApiController]
 	public class ProductController : ControllerBase
 	{
