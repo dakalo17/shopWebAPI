@@ -13,8 +13,8 @@ namespace shopWebAPI.Data
 			return 1;
 		}
 		public async Task<int> Insert(Product product) {
-			sql = "Insert INTO \"product\"(name,price,special_price,description,quantity) " +
-				"VALUES(@name,@price,@sprice,@descr,@quantity)";
+			sql = "Insert INTO \"product\"(name,price,special_price,description,quantity,image_link) " +
+				"VALUES(@name,@price,@sprice,@descr,@quantity,@imgLink)";
 			
 			var rowsAffected = 0;
 			try
@@ -27,6 +27,7 @@ namespace shopWebAPI.Data
 					cmd.Parameters.AddWithValue("@sprice",product.SpecialPrice);
 					cmd.Parameters.AddWithValue("@descr",product.Description ?? string.Empty);
 					cmd.Parameters.AddWithValue("@quantity", product.Quantity);
+					cmd.Parameters.AddWithValue("@imgLink", product.ImageLink??string.Empty);
 
 					rowsAffected = await cmd.ExecuteNonQueryAsync();
 				}
@@ -61,7 +62,8 @@ namespace shopWebAPI.Data
 							Price = Convert.ToDecimal(reader["price"]),
 							SpecialPrice = Convert.ToDecimal(reader["special_price"]),
 							Description = reader["description"].ToString(),
-							Quantity = Convert.ToInt32(reader["quantity"])
+							Quantity = Convert.ToInt32(reader["quantity"]),
+							ImageLink = reader["image_link"].ToString()
 						});
 					}
 				}
@@ -99,7 +101,8 @@ namespace shopWebAPI.Data
 							Price = Convert.ToDecimal(reader["price"]),
 							SpecialPrice = Convert.ToDecimal(reader["special_price"]),
 							Description = reader["description"].ToString(),
-							Quantity = Convert.ToInt32(reader["quantity"])
+							Quantity = Convert.ToInt32(reader["quantity"]),
+							ImageLink = reader["image_link"].ToString()
 						};
 					}
 				}

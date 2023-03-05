@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using shopWebAPI.Data;
 using shopWebAPI.Models;
+using shopWebAPI.Services;
+using shopWebAPI.Utilities;
 
 namespace shopWebAPI.Controllers;
 
@@ -8,10 +11,15 @@ namespace shopWebAPI.Controllers;
 public class UserController : ControllerBase
 {
     private readonly string?  _connectionString;
-    public UserController(IConfiguration configuration)
+	private readonly UserSqlConnection _sqlService;
+    private readonly UserAuthenticationJWTService _jwtService;
+	public UserController(IConfiguration configuration)
     {
-        _connectionString = configuration["DefaultConnection"];
-    }
+        _connectionString = configuration[DatabaseConfigurations.DATABASE_CONFIG_DEFAULT];
+		_sqlService = new UserSqlConnection(_connectionString);
+		_jwtService = new UserAuthenticationJWTService(configuration);
+
+	}
     // GET
     [HttpGet("GetUser")]
     public IActionResult GetUser()
@@ -21,13 +29,23 @@ public class UserController : ControllerBase
 
 
     [HttpPost("Login")]
-    public IActionResult Login([FromBody]User user)
+    public async Task<IActionResult> Login([FromBody]User user)
     {
-        return Ok();
-    }
+		var getUser = await _sqlService.Select(user);
+
+		if (getUser != null)
+		{
+			var token = _jwtService.CreateToken(user);
+			return Ok(token);
+		}
+		else
+		{
+			return BadRequest("User not found");
+		}
+	}
 
     [HttpPost("Register")]
-    public IActionResult Register([FromBody] Register register)
+	public async Task<IActionResult> Register([FromBody] Register register)
     {
         return Ok();
     }

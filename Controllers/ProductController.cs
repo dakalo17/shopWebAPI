@@ -53,6 +53,7 @@ namespace shopWebAPI.Controllers
 			return rowsAffected > 0 ? Ok(rowsAffected) :Conflict() ;
 		}
 
+		[Obsolete]
 		[HttpPut("PutProduct")]
 		public async Task<IActionResult> PutProduct([FromBody] Product product){
 			

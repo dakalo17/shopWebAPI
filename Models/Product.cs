@@ -11,6 +11,7 @@ namespace shopWebAPI.Models
 		public decimal SpecialPrice { get; set; }
 		public string? Description { get; set; }
 		public int Quantity { get; set; }
+		public string? ImageLink { get; set; }
 
 	}
 }

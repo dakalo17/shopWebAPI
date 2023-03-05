@@ -38,7 +38,9 @@ public class UserSqlConnection : BaseSqlConnection
                     user = new User
                     {
                         Id = Convert.ToInt32(reader["id"]),
-                        Email = reader["email"].ToString(),
+						FirstName = reader["firstName"].ToString(),
+						LastName = reader["lastname"].ToString(),
+						Email = reader["email"].ToString(),
                         Password = reader["password"].ToString()
                     };
 
@@ -86,7 +88,9 @@ public class UserSqlConnection : BaseSqlConnection
                     user = new User
                     {
                         Id = Convert.ToInt32(reader["id"]),
-                        Email = reader["email"].ToString(),
+						FirstName = reader["firstName"].ToString(),
+                        LastName = reader["lastname"].ToString(),
+						Email = reader["email"].ToString(),
                         Password = reader["password"].ToString()
                     };
                 }
@@ -104,8 +108,8 @@ public class UserSqlConnection : BaseSqlConnection
 
     public async Task<int> Insert(Register? register)
     {
-        sql = "insert into \"user\"(email,password) " +
-              "values(@email,@password)";
+        sql = "insert into \"user\"(firstname, lastname, email, password) " +
+			  "values(@firstname,@lastname,@email,@password)";
         
         var rowsAffected = 0;
         try
@@ -113,6 +117,8 @@ public class UserSqlConnection : BaseSqlConnection
             await _connection.OpenAsync();
 			
             using var cmd = new NpgsqlCommand(sql, _connection);
+			cmd.Parameters.AddWithValue("@firstname", register?.FirstName??Empty);
+			cmd.Parameters.AddWithValue("@lastname", register?.LastName??Empty);
 			cmd.Parameters.AddWithValue("@email", register?.Email??Empty);
 			cmd.Parameters.AddWithValue("@password", register?.Password ?? Empty);
 
