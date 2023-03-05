@@ -1,8 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using shopWebAPI.Data;
 using shopWebAPI.Models;
+using shopWebAPI.Models.Jwt;
+using shopWebAPI.Repository.Jwt;
 using shopWebAPI.Services;
 using shopWebAPI.Utilities;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Principal;
 
 namespace shopWebAPI.Controllers;
 
@@ -13,11 +17,13 @@ public class UserController : ControllerBase
     private readonly string?  _connectionString;
 	private readonly UserSqlConnection _sqlService;
     private readonly UserAuthenticationJWTService _jwtService;
-	public UserController(IConfiguration configuration)
+	private IUserRefreshTokenRepository _userRepo;
+	public UserController(IConfiguration configuration,IUserRefreshTokenRepository userRepo)
     {
         _connectionString = configuration[DatabaseConfigurations.DATABASE_CONFIG_DEFAULT];
 		_sqlService = new UserSqlConnection(_connectionString);
 		_jwtService = new UserAuthenticationJWTService(configuration);
+		_userRepo = userRepo;
 
 	}
     // GET
@@ -35,8 +41,14 @@ public class UserController : ControllerBase
 
 		if (getUser != null)
 		{
-			var token = _jwtService.CreateToken(user);
-			return Ok(token);
+			var tokenObj = _jwtService.CreateToken(user);
+
+			_userRepo.SaveRefreshToken(new UserRefreshToken
+			{
+				RefreshToken = tokenObj.RefreshToken,
+				Username = user.Email??string.Empty
+			});
+			return Ok(tokenObj);
 		}
 		else
 		{
@@ -44,7 +56,19 @@ public class UserController : ControllerBase
 		}
 	}
 
-    [HttpPost("Register")]
+
+	[HttpPost("RefreshToken")]
+	public async Task<IActionResult> RefreshToken([FromBody] JWTToken jwtToken)
+	{
+		if (jwtToken is null) return BadRequest();
+		var handler = new JwtSecurityTokenHandler();
+
+		IPrincipal principal = handler.ValidateToken(jwtToken.Token,
+			_jwtService.GetTokenValidatorParams(), out var validatedToken);
+
+		var username = principal?.Identity?.Name;
+	}
+	[HttpPost("Register")]
 	public async Task<IActionResult> Register([FromBody] Register register)
     {
         return Ok();

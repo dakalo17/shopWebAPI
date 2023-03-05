@@ -14,9 +14,11 @@ namespace shopWebAPI.Services
 	public class UserAuthenticationJWTService
 	{
 		private readonly string _secret;
-
+		private readonly SymmetricSecurityKey _key;
 		public UserAuthenticationJWTService(IConfiguration configuration) {
 			_secret = configuration["Jwt:Secret"]??string.Empty;
+			_key= new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+
 
 		}
 
@@ -25,17 +27,18 @@ namespace shopWebAPI.Services
 			
 
 			var claims = new Dictionary<string, object>() {
-
+				
 				{ CustomClaimNames.Id,user.Id},
 				{ CustomClaimNames.FirstName,user.FirstName??string.Empty},
 				{ CustomClaimNames.LastName,user.LastName??string.Empty},
 				{ CustomClaimNames.Email,user.Email??string.Empty},
+				//this is temporary solution
+				{ ClaimTypes.Name,user.Email??string.Empty},
 				{ CustomClaimNames.Role,-1},
 				
 			};
 
-			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
-			var creds = new SigningCredentials(key,SecurityAlgorithms.HmacSha512Signature);
+			var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);
 			var handler = new JwtSecurityTokenHandler();
 
 			var token = handler.CreateJwtSecurityToken(
@@ -62,7 +65,22 @@ namespace shopWebAPI.Services
 			
 			return jwtObj;
 		}
+		public TokenValidationParameters GetTokenValidatorParams()
+		{
+			return new TokenValidationParameters
+			{
+				ValidateIssuerSigningKey = true,
+				IssuerSigningKey = _key,
 
-	
+				ValidateIssuer = false,
+				ValidateAudience = false,
+				ValidateLifetime = true,
+
+				RequireExpirationTime = true,
+
+
+			};
+		}
+
 	}
 }
