@@ -67,7 +67,8 @@ AddJwtBearer(x =>
         ValidateAudience = false,
         ValidateLifetime = true,
 
-        RequireExpirationTime= true
+        RequireExpirationTime= true,
+        ClockSkew = TimeSpan.Zero
 
     };
 });

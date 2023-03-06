@@ -22,7 +22,7 @@ namespace shopWebAPI.Services
 
 		}
 
-		public JWTToken CreateToken(User user)
+		public JWTToken CreateToken(User user, RefreshToken? refreshToken=null)
 		{
 			
 
@@ -31,10 +31,8 @@ namespace shopWebAPI.Services
 				{ CustomClaimNames.Id,user.Id},
 				{ CustomClaimNames.FirstName,user.FirstName??string.Empty},
 				{ CustomClaimNames.LastName,user.LastName??string.Empty},
-				{ CustomClaimNames.Email,user.Email??string.Empty},
-				//this is temporary solution
-				{ ClaimTypes.Name,user.Email??string.Empty},
-				{ CustomClaimNames.Role,-1},
+				{ ClaimTypes.Email,user.Email??string.Empty},
+				{ ClaimTypes.Role,-1},
 				
 			};
 
@@ -45,7 +43,7 @@ namespace shopWebAPI.Services
 				new SecurityTokenDescriptor
 				{
 					Claims= claims,
-					Expires = DateTime.UtcNow.AddSeconds(3000),
+					Expires = DateTime.UtcNow.AddSeconds(30),
 					SigningCredentials = creds
 
 				}
@@ -57,7 +55,18 @@ namespace shopWebAPI.Services
 			var jwtObj = new JWTToken
 			{
 				Token = obj,
-				RefreshToken = refToken.GenerateRefreshToken()
+				RefreshToken = 
+				refreshToken is null ? 
+				new RefreshToken 
+				{ 
+					RToken = refToken.GenerateRefreshToken(),
+					ExpiringDate= DateTime.UtcNow.AddDays(2),
+					FkUserId= user.Id,
+					Key=Guid.NewGuid().ToString()
+					
+				}
+				: refreshToken
+				
 
 			};
 
@@ -65,7 +74,7 @@ namespace shopWebAPI.Services
 			
 			return jwtObj;
 		}
-		public TokenValidationParameters GetTokenValidatorParams()
+		public TokenValidationParameters GetTokenValidatorParams(bool expire = true)
 		{
 			return new TokenValidationParameters
 			{
@@ -74,9 +83,11 @@ namespace shopWebAPI.Services
 
 				ValidateIssuer = false,
 				ValidateAudience = false,
-				ValidateLifetime = true,
+				ValidateLifetime = expire,
 
-				RequireExpirationTime = true,
+				RequireExpirationTime = expire,
+				
+				ClockSkew = TimeSpan.Zero
 
 
 			};
