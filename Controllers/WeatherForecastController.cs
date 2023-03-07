@@ -31,4 +31,12 @@ public class WeatherForecastController : ControllerBase
             })
             .ToArray();
     }
+    
+    [HttpGet("GetTest")]
+    public IActionResult GetTest()
+    {
+        var x = Convert.ToString(Random.Shared.Next(-20, 55) + "Tested!");
+        return Ok(new {response = x});
+    }
+    
 }

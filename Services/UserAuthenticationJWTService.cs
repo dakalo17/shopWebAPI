@@ -43,7 +43,7 @@ namespace shopWebAPI.Services
 				new SecurityTokenDescriptor
 				{
 					Claims= claims,
-					Expires = DateTime.UtcNow.AddSeconds(30),
+					Expires = DateTime.UtcNow.AddSeconds(130),
 					SigningCredentials = creds
 
 				}

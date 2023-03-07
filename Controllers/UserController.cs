@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using shopWebAPI.Data;
 using shopWebAPI.Models;
@@ -13,6 +14,7 @@ using System.Text;
 
 namespace shopWebAPI.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class UserController : ControllerBase
@@ -42,7 +44,7 @@ public class UserController : ControllerBase
         return Ok();
     }
 
-
+	[AllowAnonymous]
     [HttpPost("Login")]
     public async Task<IActionResult> Login([FromBody]User user)
     {
@@ -65,7 +67,7 @@ public class UserController : ControllerBase
 		}
 	}
 
-
+    [AllowAnonymous]
 	[HttpPost("RefreshToken")]
 	public async Task<IActionResult> RefreshToken([FromBody] JWTToken jwtToken)
 	{
@@ -134,11 +136,11 @@ public class UserController : ControllerBase
 		return BadRequest("Invalid request");
 	}
 
-	
 
 
-	[HttpPost("Register")]
-	public async Task<IActionResult> Register([FromBody] Register register)
+	[AllowAnonymous]
+	[HttpPost("SignUp")]
+	public async Task<IActionResult> SignUp([FromBody] Register register)
     {
         return Ok();
     }
