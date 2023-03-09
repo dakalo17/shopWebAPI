@@ -61,10 +61,9 @@ public class UserController : ControllerBase
 
 			return rowsAffected > 0 ? Ok(tokenObj) :BadRequest("Token Problem");
 		}
-		else
-		{
-			return BadRequest("User not found");
-		}
+	    
+		return BadRequest("User not found");
+		
 	}
 
     [AllowAnonymous]
