@@ -148,7 +148,7 @@ namespace shopWebAPI.Data
 			try
 			{
 				await _connection.OpenAsync();
-				using var reader = await cmd.ExecuteReaderAsync();
+				await using var reader = await cmd.ExecuteReaderAsync();
 
 
 				

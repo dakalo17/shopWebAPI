@@ -37,10 +37,10 @@ namespace shopWebAPI.Controllers
 			return product is not null ? Ok(product) : NoContent();
 		}
 
-		[HttpGet("GetProduct/{Id}")]
-		public async Task<IActionResult> GetProduct(int Id)
+		[HttpGet("GetProduct/{id}")]
+		public async Task<IActionResult> GetProduct(int id)
 		{
-			var product = await _service.Select(Id);
+			var product = await _service.Select(id);
 
 			return product is not null ? Ok(product) : NoContent();
 		}

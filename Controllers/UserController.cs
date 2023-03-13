@@ -70,12 +70,13 @@ public class UserController : ControllerBase
 	[HttpPost("RefreshToken")]
 	public async Task<IActionResult> RefreshToken([FromBody] JWTToken jwtToken)
 	{
-		if (jwtToken is null) return BadRequest("Invalid Token");
+		if (jwtToken.RefreshToken == null)
+		  return BadRequest("Invalid Token");
 
 
 		if (jwtToken?.RefreshToken?.ExpiringDate <= DateTime.UtcNow) {
 			//if refresh token has expired
-			return Unauthorized("Refresh token expired,relogin");
+			return Unauthorized("Refresh token expired,re-login");
 		}
 
 
@@ -110,29 +111,28 @@ public class UserController : ControllerBase
 
 
 
-		//retreave user's refresh token(from database) and compare with in comming token
+		//retrieve user's refresh token(from database) and compare with in coming token
 		var getUserRefreshToken =await _refreshTokenSql.Select(userId,jwtToken?.RefreshToken?.Key??string.Empty);
 
-		if (Equals(getUserRefreshToken?.RToken, jwtToken?.RefreshToken?.RToken))
+		if (!Equals(getUserRefreshToken?.RToken, jwtToken?.RefreshToken?.RToken)) 
+			return BadRequest("Invalid request");
+		
+		var newUser = new User
 		{
-			var newUser = new User
-			{
-				Email = username,
-				FirstName = firstname,
-				LastName = lastname,
-				Id = userId
-			};
+			Email = username,
+			FirstName = firstname,
+			LastName = lastname,
+			Id = userId
+		};
 
-			var newToken = _jwtService.CreateToken(newUser, jwtToken?.RefreshToken);
+		var newToken = _jwtService.CreateToken(newUser, jwtToken?.RefreshToken);
 
 
 
-			//save refresh token to database
+		//save refresh token to database
 
-			return Ok(newToken);
-		}
+		return Ok(newToken);
 
-		return BadRequest("Invalid request");
 	}
 
 

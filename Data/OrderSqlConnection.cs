@@ -1,4 +1,5 @@
-﻿using Npgsql;
+﻿using System.Globalization;
+using Npgsql;
 using shopWebAPI.Models;
 
 namespace shopWebAPI.Data
@@ -91,11 +92,11 @@ namespace shopWebAPI.Data
 			{
 				await _connection.OpenAsync();
 
-				using var cmd = new NpgsqlCommand(sql, _connection);
+				await using var cmd = new NpgsqlCommand(sql, _connection);
 				
-				cmd.Parameters.AddWithValue("@user_id");
-				cmd.Parameters.AddWithValue("@order_date");
-				cmd.Parameters.AddWithValue("@total_cost");
+				cmd.Parameters.AddWithValue("@user_id",order.Fk_User_Id);
+				cmd.Parameters.AddWithValue("@order_date",DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
+				cmd.Parameters.AddWithValue("@total_cost",order.Total_Cost);
 				
 
 

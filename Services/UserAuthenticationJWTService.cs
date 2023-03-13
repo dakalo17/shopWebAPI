@@ -8,6 +8,7 @@ using shopWebAPI.Utilities;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace shopWebAPI.Services
 {
@@ -15,7 +16,9 @@ namespace shopWebAPI.Services
 	{
 		private readonly string _secret;
 		private readonly SymmetricSecurityKey _key;
+		private readonly IConfiguration _configuration;
 		public UserAuthenticationJWTService(IConfiguration configuration) {
+			_configuration = configuration;
 			_secret = configuration["Jwt:Secret"]??string.Empty;
 			_key= new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
 
@@ -92,6 +95,9 @@ namespace shopWebAPI.Services
 
 			};
 		}
+
+
+		
 
 	}
 }
