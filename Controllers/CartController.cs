@@ -11,13 +11,13 @@ namespace shopWebAPI.Controllers
 	public class CartController : ControllerBase
 	{
 		private readonly string? _connectionString;
-		private readonly OrderProductSqlConnection _service;
+		private readonly CartItemSqlConnection _service;
 
 		public CartController(IConfiguration configuration)
 		{
 			
 			_connectionString = configuration[DATABASE_CONFIG_DEFAULT];
-			_service = new OrderProductSqlConnection(_connectionString);
+			_service = new CartItemSqlConnection(_connectionString);
 
 		}
 
@@ -34,7 +34,7 @@ namespace shopWebAPI.Controllers
 		}
 		
 		[HttpPost("PostCart")]
-		public async Task<IActionResult> PostCart([FromBody]Order order)
+		public async Task<IActionResult> PostCart([FromBody]Cart order)
 		{
 			
 			return Ok();

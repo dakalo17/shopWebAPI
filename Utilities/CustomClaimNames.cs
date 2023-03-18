@@ -7,5 +7,7 @@
 		public static readonly string LastName = "lastname";
 		public static readonly string Email = "email";
 		public static readonly string Role = "role";
+		public static readonly string CartId = "cartId";
+
 	}
 }

@@ -21,7 +21,8 @@ namespace shopWebAPI.Controllers
 	public class CartItemController : ControllerBase
 	{
 		private readonly string? _connectionString;
-		private readonly OrderSqlConnection _service;
+		private readonly CartSqlConnection _service;
+		private readonly CartItemSqlConnection _serviceCartItem;
 		private StringValues? _token = null;
 		private readonly IConfiguration _configuration;
 
@@ -29,77 +30,73 @@ namespace shopWebAPI.Controllers
 		public CartItemController(IConfiguration configuration)
 		{
 			_connectionString = configuration[DATABASE_CONFIG_DEFAULT];
-			_service = new OrderSqlConnection(_connectionString);
+			_service = new CartSqlConnection(_connectionString);
+			_serviceCartItem = new CartItemSqlConnection(_connectionString);
 			_configuration = configuration;
 		}
 
 		[HttpGet("GetCartItem")]
-		public async Task<IActionResult> GetCartItem()
+		public async Task<IActionResult> GetCartItem(int cartId)
 		{
+			
+			var user = GetThisUser();
 
-			return Ok();
+			if (user == null) return BadRequest(); 
+
+			var cartItem = await _service.Select(user.Id,cartId);
+
+			return Ok(cartItem);
 		}
 
-		[HttpGet("GetCartItems")]
-		public async Task<IActionResult> GetCartItems()
+		//orderid == cartid
+		[HttpGet("GetCartItems/{cartId}")]
+		public async Task<IActionResult> GetCartItems(int cartId)
 		{
-			_token = Request.Headers["Authorization"];
-			if (_token is null) return BadRequest("Unexpected Internal error");
-
-
-			var handler = new JwtSecurityTokenHandler();
-			ClaimsPrincipal? principal = null;
-			try
-			{
-				var tokenParams = new UserAuthenticationJWTService(_configuration)
-					.GetTokenValidatorParams();
-				
-				
-				principal = handler.ValidateToken(_token,
-					tokenParams, out var validatedToken);
-			}
-			catch (SecurityTokenExpiredException)
-			{
-					return BadRequest("Token has expired");
-		
-			}
-			catch (SecurityTokenNoExpirationException)
-			{
-				return BadRequest("Token has no expiration date");
-			}
-			catch (Exception ex)
-			{
-				ex.GetBaseException();
-				return BadRequest("Internal error");
-			}
+			var cartProducts = await _serviceCartItem.SelectOnOrder(cartId);
 
 			
-
-			var userId = Convert.ToInt32(principal?.FindFirstValue(CustomClaimNames.Id));
-			
-			var cartItems = await _service.Select(userId);
-
-
-			
-
-
-			return Ok();
+			return cartProducts is null ? NoContent():Ok(cartProducts);
 		}
 
 	
 
 		[HttpPost("PostCartItem")]
-		public async Task<IActionResult> PostCartItem()
+		public async Task<IActionResult> PostCartItem([FromBody] CartItem cartItem)
 		{
 
-			return Ok();
+			var user = GetThisUser();
+			
+			if (user == null) return Unauthorized();
+
+			var res = await _serviceCartItem.Insert(cartItem,user.Id);
+
+			return res != null ? Ok(new AbstractResponse
+			{
+				Response = Convert.ToString(res)??string.Empty
+			})	: Conflict(new AbstractResponse
+			{
+				Response = "could not add the item"
+			});
 		}
 		
 		[HttpPut("PutCartItem")]
-		public async Task<IActionResult> PutCartItem()
+		public async Task<IActionResult> PutCartItem([FromBody] CartItem cartItem)
 		{
 
-			return Ok();
+			//Todo edit
+			//_serviceCartItem.
+			var res = await _serviceCartItem.UpdateProduct(cartItem);
+			return res is not null ? Ok(new AbstractResponse
+			{
+				Response = Convert.ToString(res)??"0"
+			}): NotFound();
+		}
+		private User? GetThisUser()
+		{
+			var auth = Request.Headers["Authorization"];
+			var token = auth[0]?.Split(" ")[1];
+			return RefreshTokenGenerator.GetUserFromToken(token ?? string.Empty, _configuration);
+		
 		}
 	}
 }

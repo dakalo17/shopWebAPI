@@ -9,7 +9,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-
+using static shopWebAPI.Utilities.DatabaseConfigurations;
 namespace shopWebAPI.Services
 {
 	public class UserAuthenticationJWTService
@@ -17,17 +17,21 @@ namespace shopWebAPI.Services
 		private readonly string _secret;
 		private readonly SymmetricSecurityKey _key;
 		private readonly IConfiguration _configuration;
+
+		private readonly CartSqlConnection _cartSqlConnection;
 		public UserAuthenticationJWTService(IConfiguration configuration) {
 			_configuration = configuration;
 			_secret = configuration["Jwt:Secret"]??string.Empty;
 			_key= new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+			_cartSqlConnection = new CartSqlConnection(configuration[DATABASE_CONFIG_DEFAULT]);
 
 
 		}
 
 		public JWTToken CreateToken(User user, RefreshToken? refreshToken=null)
 		{
-			
+
+			var cart = _cartSqlConnection.SelectNonAsync(user.Id);
 
 			var claims = new Dictionary<string, object>() {
 				
@@ -36,6 +40,7 @@ namespace shopWebAPI.Services
 				{ CustomClaimNames.LastName,user.LastName??string.Empty},
 				{ ClaimTypes.Email,user.Email??string.Empty},
 				{ ClaimTypes.Role,-1},
+				{ CustomClaimNames.CartId,(cart is null ? -1 :cart.Id)},/* Todo get the user's cart/orderid */
 				
 			};
 
