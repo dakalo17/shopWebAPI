@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace shopWebAPI.Controllers;
 
+[Authorize]
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class WeatherForecastController : ControllerBase
 {
     private static readonly string[] Summaries = new[]
@@ -29,4 +31,12 @@ public class WeatherForecastController : ControllerBase
             })
             .ToArray();
     }
+    
+    [HttpGet("GetTest")]
+    public IActionResult GetTest()
+    {
+        var x = Convert.ToString(Random.Shared.Next(-20, 55) + "Tested!");
+        return Ok(new {response = x});
+    }
+    
 }
