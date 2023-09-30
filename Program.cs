@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using shopWebAPI.Data;
 using shopWebAPI.Models.Jwt;
 using shopWebAPI.Repository.Jwt;
 using System.ComponentModel;
@@ -76,6 +77,8 @@ AddJwtBearer(x =>
 
 
 builder.Services.AddSingleton<IUserRefreshTokenRepository, UserRefreshTokenRepository>();
+
+
 
 var app = builder.Build();
 

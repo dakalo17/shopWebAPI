@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using shopWebAPI.Data;
 using shopWebAPI.Models;
@@ -7,6 +9,8 @@ using static shopWebAPI.Utilities.DatabaseConfigurations;
 
 namespace shopWebAPI.Controllers
 {
+
+	
 	[Route("api/[controller]")]
 	[ApiController]
 	public class ProductController : ControllerBase
@@ -20,7 +24,7 @@ namespace shopWebAPI.Controllers
 		}
 
 		
-
+		
 		[HttpGet("GetProducts")]
 		public async Task<IActionResult> GetProducts()
 		{

@@ -239,7 +239,7 @@ namespace shopWebAPI.Data
 			try
 			{
 				await _connection.OpenAsync();
-				transaction = _connection.BeginTransaction();
+				transaction = await _connection.BeginTransactionAsync();
 
 				Cart? order = null;
 				const string selectCartQuery = "SELECT * FROM \"order\" " +
@@ -326,16 +326,36 @@ namespace shopWebAPI.Data
 				else if (op.Fk_Order_Id > 0 && op.Fk_Product_Id > 0 )
 				{
 
-					const string updateProductCart = "update \"order_product\" " +
-														"set quantity = quantity + @quantity " +
-														"where order_product.fk_product_id =@productId and " +
-														"order_product.fk_order_id =@orderId ";
+					const string updateProductCart =
+                    @"
+					with ins as( 
 
-					using var cmd = new NpgsqlCommand(updateProductCart, _connection);
+					insert into ""order_product""(fk_order_id, fk_product_id, quantity, price,status)
+					values (@orderId, @productId, @quantity, @price,@status)
+					on conflict(fk_order_id,fk_product_id)
+
+					do nothing returning * )
+
+
+                    update ""order_product"" op 
+					set quantity=@quantity+EXCLUDED.quantity
+                    from ins 
+                    where op.fk_order_id = ins.fk_order_id
+                    and op.fk_product_id =ins.fk_product_id;"
+                    ;
+					
+              //      const string updateProductCart = "update \"order_product\+
+              //"set quantity = quantity + @quantity " +
+              //"where order_product.fk_product_id =@productId and " +
+              //"order_product.fk_order_id =@orderId ";
+
+                    using var cmd = new NpgsqlCommand(updateProductCart, _connection);
 
 					cmd.Parameters.AddWithValue("@quantity", 1);
 					cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
 					cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
+					cmd.Parameters.AddWithValue("@price", op.Price);
+					cmd.Parameters.AddWithValue("@status", op.Status);
 
 					affectedRows = await cmd.ExecuteNonQueryAsync();
 				}
@@ -344,10 +364,22 @@ namespace shopWebAPI.Data
 
 					int orderID = Math.Max(order.Id, op.Fk_Order_Id);
 					//if cart id exists
-					const string insertToCartQuery = "INSERT into \"order_product\"(fk_order_id, fk_product_id, quantity, price,status)" +
-													"Values(@order_id, @product_id, @quantity, @price,@status) ";
+					const string insertToCartQuery =
+						"insert into \"order_product\"(fk_order_id, fk_product_id, quantity, price,status)" +
+					"values (@order_id, @product_id, @quantity, @price,@status)" +
+					"on conflict(fk_order_id,fk_product_id)" +
+                    "do update set quantity = (" +
 
-					using var cmd = new NpgsqlCommand(insertToCartQuery, _connection);
+                    "select quantity + EXCLUDED.quantity " +
+                    "from \"order_product\" " +
+                    "where \"order_product\".fk_order_id = EXCLUDE.fk_order_id" +
+                    "and \"order_product\".fk_product_id =EXCLUDE.fk_product_id" +
+					");"
+					;
+
+
+
+                    using var cmd = new NpgsqlCommand(insertToCartQuery, _connection);
 
 
 					cmd.Parameters.AddWithValue("@order_id", orderID);
@@ -411,6 +443,42 @@ namespace shopWebAPI.Data
 			catch (Exception ex)
 			{
 				ex.GetBaseException() ;
+				return null;
+			}
+			finally
+			{
+
+
+				await _connection.CloseAsync();
+			}
+
+			return affectedRows;
+		}
+
+		public async Task<int?> UpdateProductWithCartItemId(CartItem op)
+		{
+
+			var affectedRows = 0;
+			try
+			{
+				const string updateProductCart = "update \"order_product\" " +
+														"set quantity = @quantity  " +
+														"where order_product.id =@cartProductId and " +
+														"order_product.fk_order_id =@orderId ";
+
+				await _connection.OpenAsync();
+
+				using var cmd = new NpgsqlCommand(updateProductCart, _connection);
+
+				cmd.Parameters.AddWithValue("@quantity", op.Quantity);
+				cmd.Parameters.AddWithValue("@cartProductId", op.Id);
+				cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
+
+				affectedRows = await cmd.ExecuteNonQueryAsync();
+			}
+			catch (Exception ex)
+			{
+				ex.GetBaseException();
 				return null;
 			}
 			finally

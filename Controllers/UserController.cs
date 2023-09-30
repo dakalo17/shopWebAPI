@@ -76,7 +76,11 @@ public class UserController : ControllerBase
 
 		if (jwtToken?.RefreshToken?.ExpiringDate <= DateTime.UtcNow) {
 			//if refresh token has expired
-			return Unauthorized("Refresh token expired,re-login");
+			return Unauthorized(new JWTToken
+			{
+				RefreshToken = null,
+				Token = null
+			});
 		}
 
 
