@@ -21,19 +21,21 @@ namespace shopWebAPI.Controllers
 	public class CartItemController : ControllerBase
 	{
 		private readonly string? _connectionString;
-		private readonly CartSqlConnection _service;
+		private readonly CartSqlConnection _serviceCart;
 		private readonly CartItemSqlConnection _serviceCartItem;
 		private StringValues? _token = null;
 		private readonly IConfiguration _configuration;
 
-
-		public CartItemController(IConfiguration configuration)
+        public CartItemController(IConfiguration configuration)
 		{
 			_connectionString = configuration[DATABASE_CONFIG_DEFAULT];
-			_service = new CartSqlConnection(_connectionString);
+            _serviceCart = new CartSqlConnection(_connectionString);
 			_serviceCartItem = new CartItemSqlConnection(_connectionString);
 			_configuration = configuration;
-		}
+
+            
+
+        }
 
 		[HttpGet("GetCartItem")]
 		public async Task<IActionResult> GetCartItem(int cartId)
@@ -43,7 +45,7 @@ namespace shopWebAPI.Controllers
 
 			if (user == null) return BadRequest(); 
 
-			var cartItem = await _service.Select(user.Id,cartId);
+			var cartItem = await _serviceCart.Select(user.Id,cartId);
 
 			return Ok(cartItem);
 		}
@@ -58,9 +60,27 @@ namespace shopWebAPI.Controllers
 			return cartProducts is null ? NoContent():Ok(cartProducts);
 		}
 
-	
 
-		[HttpPost("PostCartItem")]
+		[AllowAnonymous]
+        [HttpGet("GetCartItems")]
+        public async Task<IActionResult> GetCartItems()
+        {
+			var user = GetThisUser();
+
+
+			var userCart = await _serviceCart.SelectAsync(user.Id);
+
+
+
+
+            var cartProducts = await _serviceCartItem.SelectOnOrder(userCart.Id);
+
+
+            return cartProducts is null ? NoContent() : Ok(cartProducts);
+        }
+
+
+        [HttpPost("PostCartItem")]
 		public async Task<IActionResult> PostCartItem([FromBody] CartItem cartItem)
 		{
 
@@ -70,15 +90,13 @@ namespace shopWebAPI.Controllers
 
 			var res = await _serviceCartItem.Insert(cartItem,user.Id);
 
-			return res != null ? Ok(new AbstractResponse
+			return res != null ? Ok(res) : Conflict(new CartProduct
 			{
-				Response = Convert.ToString(res)??string.Empty
-			})	: Conflict(new AbstractResponse
-			{
-				Response = "could not add the item"
+				Name = "ERROR",
+				Image_link = "ERROR"
 			});
 		}
-		
+		[Obsolete("Use PostCartItem instead,its using Upseart")]
 		[HttpPut("PutCartItem")]
 		public async Task<IActionResult> PutCartItem([FromBody] CartItem cartItem)
 		{
