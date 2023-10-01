@@ -1,6 +1,7 @@
 ﻿using Npgsql;
 using shopWebAPI.Models;
 using System.Globalization;
+using System.Reflection.PortableExecutable;
 
 namespace shopWebAPI.Data
 {
@@ -20,7 +21,7 @@ namespace shopWebAPI.Data
 				"WHERE status=1 and fk_order_id=@cartId";
 
 			List<CartItem?>? ops = null;
-
+			
 			try
 			{
 				using var cmd = new NpgsqlCommand(sql, _connection);
@@ -44,19 +45,22 @@ namespace shopWebAPI.Data
 							Status = Convert.ToInt32(reader["status"])
 
 						});
-
-					}
+                        
+                    }
 				}
-			}
+                if (!reader.IsClosed)
+                    await reader.CloseAsync();
+            }
 			catch (Exception ex)
 			{
 				ex.GetBaseException();
 				return null;
 			}
 			finally
-			{
+            {
 				await _connection.CloseAsync();
-			}
+             
+            }
 
 			return ops;
 		}
@@ -322,9 +326,10 @@ namespace shopWebAPI.Data
 					{
 						orderIdFromCreate = Convert.ToInt32(reader["id"].ToString());
 					}
-				
-					//if not created the return null
-					if (orderIdFromCreate <= 0) return null;
+					if (!reader.IsClosed)
+						await reader.CloseAsync();
+                    //if not created the return null
+                    if (orderIdFromCreate <= 0) return null;
 
 
 
@@ -332,7 +337,7 @@ namespace shopWebAPI.Data
 					const string insertToCartQuery = "INSERT into \"order_product\"(fk_order_id, fk_product_id, quantity, price,status)" +
 													"Values(@order_id, @product_id, @quantity, @price,@status)";
 
-					using var cmd1 = new NpgsqlCommand(insertToCartQuery, _connection);
+                    await using var cmd1 = new NpgsqlCommand(insertToCartQuery, _connection);
 					cmd1.Transaction = transaction;
 
 					cmd1.Parameters.AddWithValue("@order_id", orderIdFromCreate);
@@ -359,7 +364,7 @@ namespace shopWebAPI.Data
 						where ""order"".fk_user_id =@userId;";
 
 
-                        using var cmd1 = new NpgsqlCommand(getCartOrderIdByUserId, _connection, transaction);
+                        await using var cmd1 = new NpgsqlCommand(getCartOrderIdByUserId, _connection, transaction);
                         
                         cmd1.Parameters.AddWithValue("@userId",userId);
 
@@ -371,8 +376,8 @@ namespace shopWebAPI.Data
 							
                             
                         }
-						if (!readerOrder.IsClosed)
-								await readerOrder.CloseAsync();
+                        if (!readerOrder.IsClosed)
+                            await readerOrder.CloseAsync();
                     }
 
 
@@ -384,7 +389,7 @@ namespace shopWebAPI.Data
 					";
 
                     op.Fk_Order_Id = int.Max(op.Fk_Order_Id, getorderId);
-                    using var cmd = new NpgsqlCommand(updateProductCart, _connection);
+                    await using var cmd = new NpgsqlCommand(updateProductCart, _connection);
 
                     cmd.Transaction = transaction;
                     cmd.Parameters.AddWithValue("@quantity", 1);
@@ -404,7 +409,7 @@ namespace shopWebAPI.Data
                     const string sql1 = "SELECT * FROM \"product\" " +
                         "WHERE id=@id;";
 
-                    using var cmd3 = new NpgsqlCommand(sql1, _connection);
+                    await using var cmd3 = new NpgsqlCommand(sql1, _connection);
                     cmd3.Transaction = transaction;
                     cmd3.Parameters.AddWithValue("@id", op.Fk_Product_Id);
 
@@ -425,14 +430,13 @@ namespace shopWebAPI.Data
                             ImageLink = reader["image_link"].ToString()
                         };
                     }
-
-					if (!reader.IsClosed)
-						await reader.CloseAsync();
-                    
-					
+                    if (!reader.IsClosed)
+                        await reader.CloseAsync();
 
 
-				}
+
+
+                }
 
 
 
