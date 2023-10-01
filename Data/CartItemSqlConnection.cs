@@ -70,7 +70,7 @@ namespace shopWebAPI.Data
 			try
 			{
 				using var cmd = new NpgsqlCommand(sql, _connection);
-				using var reader = await cmd.ExecuteReaderAsync();
+				await using var reader = await cmd.ExecuteReaderAsync();
 				ops = new List<CartItem?>();
 				while (await reader.ReadAsync())
 				{
@@ -106,23 +106,24 @@ namespace shopWebAPI.Data
 		public async Task<List<Product?>?> SelectOnOrder(int orderId)
 		{
 
-			//sql = "SELECT * FROM \"order_product\" " +
-			//	"WHERE order_id = @orderId";
+            //sql = "SELECT * FROM \"order_product\" " +
+            //	"WHERE order_id = @orderId";
 
-
-			sql =	"select " +
-					"p.name, " +
-					"p.price, " +
-					"p.image_link, " +
-                    "p.description, " +
-					"p.special_price, " +
-				//	"\"order_product\".id as order_product_id,   " +
-					"\"order_product\".quantity " +
-					"from \"order_product\" " +
-					"inner join \"product\" p on " +
-					"\"order_product\".fk_product_id = p.id " +
-                    "where  \"order_product\".status= @status and \"order_product\".fk_order_id = @orderId " +
-                    "order by \"order_product\".fk_order_id";
+            //	\"order_product\".id as order_product_id,   " +
+            sql =	@"
+					select 
+					p.name, 
+					p.price,
+					p.image_link, 
+                    p.description, 
+					p.special_price, 
+				
+					""order_product"".quantity 
+					from ""order_product"" 
+					inner join ""product"" p on 
+					""order_product"".fk_product_id = p.id 
+                    where  ""order_product"".status= @status and ""order_product"".fk_order_id = @orderId 
+                    order by ""order_product"".fk_order_id";
 
 
 			List<Product?>? ops = null;
@@ -134,7 +135,7 @@ namespace shopWebAPI.Data
 				cmd.Parameters.AddWithValue("@status", 1);
 				
 
-				using var reader = await cmd.ExecuteReaderAsync();
+				await using var reader = await cmd.ExecuteReaderAsync();
 				ops = new List<Product?>();
 				while (await reader.ReadAsync())
 				{
@@ -197,7 +198,7 @@ namespace shopWebAPI.Data
 				cmd.Parameters.AddWithValue("@orderProductId", orderProductId);
 				cmd.Parameters.AddWithValue("@status", 1);
 
-				using var reader = await cmd.ExecuteReaderAsync();
+                await using var reader = await cmd.ExecuteReaderAsync();
 				
 				while (await reader.ReadAsync())
 				{
@@ -257,28 +258,23 @@ namespace shopWebAPI.Data
 				using (var cmd = new NpgsqlCommand(selectCartQuery, _connection))
 				{
 
-					
+					cmd.Transaction = transaction;
 					cmd.Parameters.AddWithValue("@userId", userId);
 
-					using var reader = await cmd.ExecuteReaderAsync();
+                    await using var reader = await cmd.ExecuteReaderAsync();
 
-					while (await reader.ReadAsync())
-					{	
-						if (reader.HasRows)
+
+					if (await reader.ReadAsync() && reader.HasRows)
+					{
+						order = new Cart
 						{
-							order = new Cart
-							{
-								Id = Convert.ToInt32(reader["id"]),
-								Fk_User_Id = Convert.ToInt32(reader["fk_user_id"]),
-								Order_Date = Convert.ToDateTime(reader["order_date"]),
-								Total_Cost = Convert.ToDecimal(reader["total_cost"]),
-								Status = Convert.ToInt32(reader["status"]),
-							};
-						}
+							Id = Convert.ToInt32(reader["id"]),
+							Fk_User_Id = Convert.ToInt32(reader["fk_user_id"]),
+							Order_Date = Convert.ToDateTime(reader["order_date"]),
+							Total_Cost = Convert.ToDecimal(reader["total_cost"]),
+							Status = Convert.ToInt32(reader["status"]),
+						};
 					}
-
-					if (!reader.IsClosed)
-						await reader.CloseAsync(); 
 
 
 				}
@@ -287,20 +283,38 @@ namespace shopWebAPI.Data
 
 				if (order == null)
 				{
+
+
 					//TODO- separate to insert and select
 					//create cart id/entry
 					const string createCart =
 						"INSERT into \"order\"(fk_user_id, order_date, total_cost,status) " +
-						"Values(@user_id, @order_date, @total_cost,@status) " +
-						"returning id,fk_user_id,order_date, total_cost,status;";
+						"Values(@user_id, @order_date, @total_cost,@status) ;" +
+						"";
 					await using var cmd = new NpgsqlCommand(createCart, _connection);
 
+					cmd.Transaction = transaction;
 					cmd.Parameters.AddWithValue("@user_id", userId);
 					cmd.Parameters.AddWithValue("@order_date", DateTime.UtcNow);
 					cmd.Parameters.AddWithValue("@total_cost", 0);
 					cmd.Parameters.AddWithValue("@status", 1);
 
-					var reader = await cmd.ExecuteReaderAsync();
+					affectedRows = await cmd.ExecuteNonQueryAsync();
+
+					if (affectedRows != 1) throw new Exception();
+
+					//get the inserted value
+
+					const string selectInsertedCart = @"
+						select id from ""order""
+						where fk_user_id = @userId;
+					";
+
+					await using var cmdget = new NpgsqlCommand(selectInsertedCart, _connection);
+					cmdget.Transaction = transaction;
+					cmdget.Parameters.AddWithValue("@userId", userId);
+
+                    await using var reader = await cmdget.ExecuteReaderAsync();
 
 					int orderIdFromCreate = 0;
 
@@ -308,8 +322,7 @@ namespace shopWebAPI.Data
 					{
 						orderIdFromCreate = Convert.ToInt32(reader["id"].ToString());
 					}
-					if (!reader.IsClosed)
-						await reader.CloseAsync();
+				
 					//if not created the return null
 					if (orderIdFromCreate <= 0) return null;
 
@@ -320,7 +333,7 @@ namespace shopWebAPI.Data
 													"Values(@order_id, @product_id, @quantity, @price,@status)";
 
 					using var cmd1 = new NpgsqlCommand(insertToCartQuery, _connection);
-
+					cmd1.Transaction = transaction;
 
 					cmd1.Parameters.AddWithValue("@order_id", orderIdFromCreate);
 					cmd1.Parameters.AddWithValue("@product_id", op.Fk_Product_Id);
@@ -328,12 +341,13 @@ namespace shopWebAPI.Data
 					cmd1.Parameters.AddWithValue("@price", op.Price);
 					cmd1.Parameters.AddWithValue("@status", 1);
 
-					affectedRows = await cmd.ExecuteNonQueryAsync();
+					affectedRows = await cmd1.ExecuteNonQueryAsync();
 
 
 				}
-				else if (op.Fk_Order_Id > 0)
+				else if (op!=null )
 				{
+					
 					int getorderId = -1;
                     if (op.Fk_Order_Id < 0)
                     {
@@ -345,15 +359,20 @@ namespace shopWebAPI.Data
 						where ""order"".fk_user_id =@userId;";
 
 
-                        using var cmd1 = new NpgsqlCommand(getCartOrderIdByUserId, _connection);
-                        cmd1.Parameters.AddWithValue("@userId");
+                        using var cmd1 = new NpgsqlCommand(getCartOrderIdByUserId, _connection, transaction);
+                        
+                        cmd1.Parameters.AddWithValue("@userId",userId);
 
-                        var reader = await cmd1.ExecuteReaderAsync();
+                        await using var readerOrder = await cmd1.ExecuteReaderAsync();
 
-                        if (await reader.ReadAsync() && reader.HasRows)
+                        if (await readerOrder.ReadAsync() && readerOrder.HasRows)
                         {
-                            getorderId = Convert.ToInt32(reader["id"].ToString());
+                            getorderId = Convert.ToInt32(readerOrder["id"].ToString());
+							
+                            
                         }
+						if (!readerOrder.IsClosed)
+								await readerOrder.CloseAsync();
                     }
 
 
@@ -361,54 +380,55 @@ namespace shopWebAPI.Data
 					insert into ""order_product"" (fk_order_id, fk_product_id, quantity, price,status)
 					values (@orderId, @productId, @quantity, @price,@status)
 					on conflict(fk_order_id,fk_product_id)
-					do update set quantity = ""order_product"".quantity+@quantity
-					returning fk_order_id,fk_product_id;
+					do update set quantity = ""order_product"".quantity+@quantity;
 					";
 
-					var orderId = int.Max(op.Fk_Order_Id, getorderId);
+                    op.Fk_Order_Id = int.Max(op.Fk_Order_Id, getorderId);
                     using var cmd = new NpgsqlCommand(updateProductCart, _connection);
 
-					cmd.Parameters.AddWithValue("@quantity", 1);
+                    cmd.Transaction = transaction;
+                    cmd.Parameters.AddWithValue("@quantity", 1);
 					cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
-					cmd.Parameters.AddWithValue("@orderId", orderId);
+					cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
 					cmd.Parameters.AddWithValue("@price", op.Price);
 					cmd.Parameters.AddWithValue("@status", op.Status);
 
 
-                     
-			        int productId = -1;
+                    
 
-					//affectedRows = await cmd.ExecuteNonQueryAsync();
-					var reader1 = await cmd.ExecuteReaderAsync();
+					affectedRows = await cmd.ExecuteNonQueryAsync();
+					//var reader1 = await cmd.ExecuteReaderAsync();
 
-					if (await reader1.ReadAsync() && reader1.HasRows)
-					{
-						productId = Convert.ToInt32(reader1["fk_product_id"].ToString());
-                        const string sql1 = "SELECT * FROM \"product\" " +
-                           "WHERE id=@id;";
+					
+					
+                    const string sql1 = "SELECT * FROM \"product\" " +
+                        "WHERE id=@id;";
 
-                        using var cmd3 = new NpgsqlCommand(sql1, _connection);
+                    using var cmd3 = new NpgsqlCommand(sql1, _connection);
+                    cmd3.Transaction = transaction;
+                    cmd3.Parameters.AddWithValue("@id", op.Fk_Product_Id);
 
-                       
-                        using var reader = await cmd3.ExecuteReaderAsync();
+
+                    await using var reader = await cmd3.ExecuteReaderAsync();
 
                 
-                        if (await reader.ReadAsync() && reader.HasRows)
+                    if (await reader.ReadAsync() && reader.HasRows)
+                    {
+                        product = new Product
                         {
-                            product = new Product
-                            {
-                                Id = Convert.ToInt32(reader["id"]),
-                                Name = reader["name"].ToString(),
-                                Price = Convert.ToDecimal(reader["price"]),
-                                SpecialPrice = Convert.ToDecimal(reader["special_price"]),
-                                Description = reader["description"].ToString(),
-                                Quantity = Convert.ToInt32(reader["quantity"]),
-                                ImageLink = reader["image_link"].ToString()
-                            };
-                        }
-                        
-
+                            Id = Convert.ToInt32(reader["id"]),
+                            Name = reader["name"].ToString(),
+                            Price = Convert.ToDecimal(reader["price"]),
+                            SpecialPrice = Convert.ToDecimal(reader["special_price"]),
+                            Description = reader["description"].ToString(),
+                            Quantity = Convert.ToInt32(reader["quantity"]),
+                            ImageLink = reader["image_link"].ToString()
+                        };
                     }
+
+					if (!reader.IsClosed)
+						await reader.CloseAsync();
+                    
 					
 
 
