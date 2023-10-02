@@ -51,9 +51,12 @@ namespace shopWebAPI.Controllers
 		}
 
 		//orderid == cartid
+		[Obsolete]
 		[HttpGet("GetCartItems/{cartId}")]
 		public async Task<IActionResult> GetCartItems(int cartId)
 		{
+
+			//TODO user ID required
 			var cartProducts = await _serviceCartItem.SelectOnOrder(cartId);
 
 			
@@ -68,17 +71,15 @@ namespace shopWebAPI.Controllers
 			var user = GetThisUser();
 
 
-			var userCart = await _serviceCart.SelectAsync(user.Id);
+			if(user is null) return BadRequest();
 
-
-
-
-            var cartProducts = await _serviceCartItem.SelectOnOrder(userCart.Id);
+            var cartProducts = await _serviceCartItem.SelectOnOrder(user.Id);
 
 
             return cartProducts is null ? NoContent() : Ok(cartProducts);
         }
 
+        //[AllowAnonymous]
 
         [HttpPost("PostCartItem")]
 		public async Task<IActionResult> PostCartItem([FromBody] CartItem cartItem)

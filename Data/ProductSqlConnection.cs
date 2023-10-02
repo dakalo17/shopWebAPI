@@ -49,7 +49,7 @@ namespace shopWebAPI.Data
 			try
 			{
 				await _connection.OpenAsync();
-				using var reader = await cmd.ExecuteReaderAsync();
+				await using var reader = await cmd.ExecuteReaderAsync();
 
 				products = new List<Product?>();
 
@@ -67,11 +67,17 @@ namespace shopWebAPI.Data
 						});
 					}
 				}
+				if (!reader.IsClosed)
+					await reader.CloseAsync();
 			}
 			catch(Exception ex)
 			{
 				ex.GetBaseException();
 				return null;
+			}
+			finally
+			{
+				await _connection.CloseAsync();
 			}
 
 			return products;

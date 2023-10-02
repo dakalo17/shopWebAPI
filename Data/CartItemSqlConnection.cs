@@ -107,22 +107,54 @@ namespace shopWebAPI.Data
 			return ops;
 		}
 
-		public async Task<List<Product?>?> SelectOnOrder(int orderId)
+		public async Task<List<Product?>?> SelectOnOrder(int userId)
 		{
 
-            //sql = "SELECT * FROM \"order_product\" " +
-            //	"WHERE order_id = @orderId";
 
-            //	\"order_product\".id as order_product_id,   " +
-            sql =	@"
+
+			List<Product?>? ops = null;
+
+            NpgsqlTransaction transaction = null;
+            try {
+                await _connection.OpenAsync();
+                transaction = await _connection.BeginTransactionAsync();
+
+                const string selectCartId = @"
+							select id
+							from ""order""
+							where fk_user_id = @userId;
+							";
+
+				await using var cmdSelectCart = new NpgsqlCommand(selectCartId,_connection,transaction);
+
+				cmdSelectCart.Parameters.AddWithValue("@userId", userId);
+
+				await using var readerCart = await cmdSelectCart.ExecuteReaderAsync();
+
+                int orderId = -1;
+                if (readerCart != null && await readerCart.ReadAsync() && readerCart.HasRows )
+				{
+					orderId = Convert.ToInt32(readerCart["id"].ToString());
+				}
+
+				if (readerCart != null&&!readerCart.IsClosed)
+					await readerCart.CloseAsync();
+
+				
+
+				//Now use that retreaved id to select the cart of the user
+
+
+                sql = @"
 					select 
+					p.id,	
 					p.name, 
 					p.price,
 					p.image_link, 
                     p.description, 
-					p.special_price, 
-				
-					""order_product"".quantity 
+					p.special_price, 				
+					""order_product"".quantity
+
 					from ""order_product"" 
 					inner join ""product"" p on 
 					""order_product"".fk_product_id = p.id 
@@ -130,11 +162,9 @@ namespace shopWebAPI.Data
                     order by ""order_product"".fk_order_id";
 
 
-			List<Product?>? ops = null;
 
-			try {
-				await _connection.OpenAsync();
-				using var cmd = new NpgsqlCommand(sql, _connection);
+
+				await using var cmd = new NpgsqlCommand(sql, _connection,transaction);
 				cmd.Parameters.AddWithValue("@orderId", orderId);
 				cmd.Parameters.AddWithValue("@status", 1);
 				
@@ -148,7 +178,9 @@ namespace shopWebAPI.Data
 						ops.Add(new Product
 						{
 							//Cart_product_id = Convert.ToInt32(reader["order_product_id"]),
-							Price = Convert.ToDecimal(reader["price"]),
+							Id = Convert.ToInt32(reader["id"]),
+
+                            Price = Convert.ToDecimal(reader["price"]),
 							
 							Quantity = Convert.ToInt32(reader["quantity"]),
 							Name = reader["name"].ToString(),
@@ -161,10 +193,17 @@ namespace shopWebAPI.Data
 
 					}
 				}
+                if (reader != null && !reader.IsClosed)
+                    await reader.CloseAsync();
+                await transaction.CommitAsync();
 			} 
 			catch (Exception ex) {
-				ex.GetBaseException();
-				return null;
+                ex.GetBaseException();
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+
+
+                return null;
 			}
 			finally
 			{
@@ -292,9 +331,8 @@ namespace shopWebAPI.Data
 					//TODO- separate to insert and select
 					//create cart id/entry
 					const string createCart =
-						"INSERT into \"order\"(fk_user_id, order_date, total_cost,status) " +
-						"Values(@user_id, @order_date, @total_cost,@status) ;" +
-						"";
+						@"INSERT into ""order""(fk_user_id, order_date, total_cost,status) 
+						Values(@user_id, @order_date, @total_cost,@status) ;";
 					await using var cmd = new NpgsqlCommand(createCart, _connection);
 
 					cmd.Transaction = transaction;
@@ -396,13 +434,13 @@ namespace shopWebAPI.Data
 					cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
 					cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
 					cmd.Parameters.AddWithValue("@price", op.Price);
-					cmd.Parameters.AddWithValue("@status", op.Status);
+					cmd.Parameters.AddWithValue("@status", 1);
 
 
                     
 
 					affectedRows = await cmd.ExecuteNonQueryAsync();
-					//var reader1 = await cmd.ExecuteReaderAsync();
+					
 
 					
 					
