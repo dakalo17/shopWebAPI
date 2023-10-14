@@ -283,7 +283,7 @@ namespace shopWebAPI.Data
 			return op;
 		}
 
-		public async Task<Product?> Insert(CartItem op,int userId)
+		public async Task<Product?> Insert(CartItem op,int userId,bool isUpdate)
 		{
 			
 
@@ -392,7 +392,7 @@ namespace shopWebAPI.Data
 				{
 					
 					int getorderId = -1;
-                    if (op.Fk_Order_Id < 0)
+                    if (op.Fk_Order_Id <= 0)
                     {
 
                         //get the cart by user Id
@@ -418,19 +418,26 @@ namespace shopWebAPI.Data
                             await readerOrder.CloseAsync();
                     }
 
+					var increment = "";
 
-                    const string updateProductCart = @"
+					if (isUpdate)
+					{
+						increment = @" ""order_product"".quantity +";
+						op.Quantity = 1;
+					}
+
+                    string updateProductCart = $@"
 					insert into ""order_product"" (fk_order_id, fk_product_id, quantity, price,status)
 					values (@orderId, @productId, @quantity, @price,@status)
 					on conflict(fk_order_id,fk_product_id)
-					do update set quantity = ""order_product"".quantity+@quantity;
+					do update set quantity = {increment} @quantity;
 					";
 
                     op.Fk_Order_Id = int.Max(op.Fk_Order_Id, getorderId);
                     await using var cmd = new NpgsqlCommand(updateProductCart, _connection);
 
                     cmd.Transaction = transaction;
-                    cmd.Parameters.AddWithValue("@quantity", 1);
+                    cmd.Parameters.AddWithValue("@quantity", op.Quantity);
 					cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
 					cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
 					cmd.Parameters.AddWithValue("@price", op.Price);

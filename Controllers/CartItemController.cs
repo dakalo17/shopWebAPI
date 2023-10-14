@@ -82,14 +82,14 @@ namespace shopWebAPI.Controllers
         //[AllowAnonymous]
 
         [HttpPost("PostCartItem")]
-		public async Task<IActionResult> PostCartItem([FromBody] CartItem cartItem)
+		public async Task<IActionResult> PostCartItem([FromBody] CartItem cartItem,bool isUpdate = false)
 		{
 
 			var user = GetThisUser();
 			
 			if (user == null) return Unauthorized();
 
-			var res = await _serviceCartItem.Insert(cartItem,user.Id);
+            var res = await _serviceCartItem.Insert(cartItem, user.Id, isUpdate);
 
 			return res != null ? Ok(res) : Conflict(new CartProduct
 			{
@@ -97,6 +97,8 @@ namespace shopWebAPI.Controllers
 				Image_link = "ERROR"
 			});
 		}
+
+
 		[Obsolete("Use PostCartItem instead,its using Upseart")]
 		[HttpPut("PutCartItem")]
 		public async Task<IActionResult> PutCartItem([FromBody] CartItem cartItem)
