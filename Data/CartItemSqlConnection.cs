@@ -1,5 +1,6 @@
 ﻿using Npgsql;
 using shopWebAPI.Models;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection.PortableExecutable;
 
@@ -298,6 +299,7 @@ namespace shopWebAPI.Data
 				Cart? order = null;
 				const string selectCartQuery = "SELECT * FROM \"order\" " +
 				"WHERE fk_user_id=@userId";
+				//retreave cart(s) of user
 				using (var cmd = new NpgsqlCommand(selectCartQuery, _connection))
 				{
 
@@ -366,32 +368,36 @@ namespace shopWebAPI.Data
 					}
 					if (!reader.IsClosed)
 						await reader.CloseAsync();
-                    //if not created the return null
-                    if (orderIdFromCreate <= 0) return null;
+					//if not created the return null
+
+
+					op.Fk_Order_Id = orderIdFromCreate;
+                    if (orderIdFromCreate <= 0) throw new Exception();
 
 
 
+					//Insert !!! Update missing
+					//const string insertToCartQuery = "INSERT into \"order_product\"(fk_order_id, fk_product_id, quantity, price,status)" +
+					//								"Values(@order_id, @product_id, @quantity, @price,@status)";
 
-					const string insertToCartQuery = "INSERT into \"order_product\"(fk_order_id, fk_product_id, quantity, price,status)" +
-													"Values(@order_id, @product_id, @quantity, @price,@status)";
+     //               await using var cmd1 = new NpgsqlCommand(insertToCartQuery, _connection);
+					//cmd1.Transaction = transaction;
 
-                    await using var cmd1 = new NpgsqlCommand(insertToCartQuery, _connection);
-					cmd1.Transaction = transaction;
+					//cmd1.Parameters.AddWithValue("@order_id", orderIdFromCreate);
+					//cmd1.Parameters.AddWithValue("@product_id", op.Fk_Product_Id);
+					//cmd1.Parameters.AddWithValue("@quantity", op.Quantity);
+					//cmd1.Parameters.AddWithValue("@price", op.Price);
+					//cmd1.Parameters.AddWithValue("@status", 1);
 
-					cmd1.Parameters.AddWithValue("@order_id", orderIdFromCreate);
-					cmd1.Parameters.AddWithValue("@product_id", op.Fk_Product_Id);
-					cmd1.Parameters.AddWithValue("@quantity", op.Quantity);
-					cmd1.Parameters.AddWithValue("@price", op.Price);
-					cmd1.Parameters.AddWithValue("@status", 1);
-
-					affectedRows = await cmd1.ExecuteNonQueryAsync();
+					//affectedRows = await cmd1.ExecuteNonQueryAsync();
 
 
 				}
-				else if (op!=null )
+
+				if (op!=null )
 				{
 					
-					int getorderId = -1;
+					//int getorderId = -1;
                     if (op.Fk_Order_Id <= 0)
                     {
 
@@ -410,43 +416,122 @@ namespace shopWebAPI.Data
 
                         if (await readerOrder.ReadAsync() && readerOrder.HasRows)
                         {
-                            getorderId = Convert.ToInt32(readerOrder["id"].ToString());
-							
-                            
+                            op.Fk_Order_Id = Convert.ToInt32(readerOrder["id"].ToString());
+
                         }
                         if (!readerOrder.IsClosed)
                             await readerOrder.CloseAsync();
                     }
 
-					var increment = "";
+					//var increment = "";
 
-					if (isUpdate)
+					//if (isUpdate)
+					//{
+					//	increment = @" ""order_product"".quantity +";
+					//	op.Quantity = 1;
+					//}
+
+					//               string updateProductCart = $@"
+					//insert into ""order_product"" (fk_order_id, fk_product_id, quantity, price,status)
+					//values (@orderId, @productId, @quantity, @price,@status)
+					//on conflict(fk_order_id,fk_product_id)
+					//do update set quantity = {increment} @quantity;
+					//";
+
+					string upsertCheck =  $@"select COUNT(*) from ""order_product""
+											where fk_order_id =@fk_order_id and fk_product_id =@fk_product_id;";
+
+                    await using var cmdUpsert = new NpgsqlCommand(upsertCheck,_connection);
+
+					cmdUpsert.Transaction = transaction;
+                    cmdUpsert.Parameters.AddWithValue("@fk_order_id",op.Fk_Order_Id);
+                    cmdUpsert.Parameters.AddWithValue("@fk_product_id", op.Fk_Product_Id);
+
+                    await using var result = await cmdUpsert.ExecuteReaderAsync();
+                    int ucheck = 0;
+
+                    if (await result.ReadAsync() && result.HasRows)
 					{
-						increment = @" ""order_product"".quantity +";
-						op.Quantity = 1;
+						ucheck = Convert.ToInt32(result["count"]);
 					}
 
-                    string updateProductCart = $@"
-					insert into ""order_product"" (fk_order_id, fk_product_id, quantity, price,status)
-					values (@orderId, @productId, @quantity, @price,@status)
-					on conflict(fk_order_id,fk_product_id)
-					do update set quantity = {increment} @quantity;
-					";
+					if(!result.IsClosed)
+					{
+						await result.CloseAsync();
+					}
+					//if a duplicate exists (product in a x cart) -> update quantity
+					if (ucheck > 0)
+					{
+						
+						string sqlUpdate = "";
+						//if its to not increment the quantity amount
+                        if (isUpdate) {
+                            sqlUpdate = $@"update ""order_product"" SET
+										quantity =  @addQuant
+										where fk_order_id = @fk_order_id and fk_product_id = @fk_product_id";
+						}
+						else
+						{
+                            sqlUpdate = $@"update ""order_product"" SET
+										quantity = quantity + @addQuant
+										where fk_order_id = @fk_order_id and fk_product_id = @fk_product_id";
+                        }
+						
 
-                    op.Fk_Order_Id = int.Max(op.Fk_Order_Id, getorderId);
-                    await using var cmd = new NpgsqlCommand(updateProductCart, _connection);
+						
 
-                    cmd.Transaction = transaction;
-                    cmd.Parameters.AddWithValue("@quantity", op.Quantity);
-					cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
-					cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
-					cmd.Parameters.AddWithValue("@price", op.Price);
-					cmd.Parameters.AddWithValue("@status", 1);
+						await using var cmdUpdate = new NpgsqlCommand(sqlUpdate,_connection);
+						cmdUpdate.Transaction = transaction;
 
 
-                    
+                        cmdUpdate.Parameters.AddWithValue("@fk_product_id", op.Fk_Product_Id);
+                        cmdUpdate.Parameters.AddWithValue("@fk_order_id", op.Fk_Order_Id);
+                        cmdUpdate.Parameters.AddWithValue("@addQuant", op.Quantity);
 
-					affectedRows = await cmd.ExecuteNonQueryAsync();
+                        if (await cmdUpdate.ExecuteNonQueryAsync() <= 0) 
+							throw new Exception("Could not update quantity of the cart item");
+
+						// upserting section
+
+
+					}
+					else
+					{
+
+						string sqlInsert = $@"insert into ""order_product""
+							   (fk_order_id, fk_product_id, quantity, price, status)
+						values (@orderId, @productId, @quantity, @price,@status)";
+						
+						await using var cmd = new NpgsqlCommand(sqlInsert,_connection);
+						
+						cmd.Transaction = transaction;
+
+                        cmd.Parameters.AddWithValue("@quantity", op.Quantity);
+                        cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
+                        cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
+                        cmd.Parameters.AddWithValue("@price", op.Price);
+                        cmd.Parameters.AddWithValue("@status", 1);
+
+
+                        if (await cmd.ExecuteNonQueryAsync() <= 0)
+                            throw new Exception("Could not insert the cart item");
+                    }
+
+
+                    //               op.Fk_Order_Id = int.Max(op.Fk_Order_Id, getorderId);
+                    //               await using var cmd = new NpgsqlCommand(updateProductCart, _connection);
+
+                    //               cmd.Transaction = transaction;
+                    //               cmd.Parameters.AddWithValue("@quantity", op.Quantity);
+                    //cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
+                    //cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
+                    //cmd.Parameters.AddWithValue("@price", op.Price);
+                    //cmd.Parameters.AddWithValue("@status", 1);
+
+
+
+
+                    //affectedRows = await cmd.ExecuteNonQueryAsync();
 					
 
 					
@@ -471,7 +556,7 @@ namespace shopWebAPI.Data
                             Price = Convert.ToDecimal(reader["price"]),
                             SpecialPrice = Convert.ToDecimal(reader["special_price"]),
                             Description = reader["description"].ToString(),
-                            Quantity = Convert.ToInt32(reader["quantity"]),
+                            Quantity = Convert.ToInt32(op.Quantity),
                             ImageLink = reader["image_link"].ToString()
                         };
                     }
