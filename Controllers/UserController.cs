@@ -36,6 +36,8 @@ public class UserController : ControllerBase
 		_refreshTokenSql = new RefreshTokenSqlConnection(_connectionString);
 		_configuration = configuration;
 
+		
+
 	}
     // GET
     [HttpGet("GetUser")]
@@ -44,7 +46,32 @@ public class UserController : ControllerBase
         return Ok();
     }
 
+
+
+	// pw & username
 	[AllowAnonymous]
+	[HttpPost("LoginAuth2")]
+	public async Task<IActionResult> LoginAuth2([FromBody] object req)
+	{
+		var grantType = "grant_type";
+		var pw_un = "password&username";
+
+		string[] split = { "ok", "1" };
+
+		
+
+
+		
+
+		return await Login(new User
+        {
+            Email = split[1],
+            Password = split[0],
+        }); 
+
+	}
+
+    [AllowAnonymous]
     [HttpPost("Login")]
     public async Task<IActionResult> Login([FromBody]User user)
     {

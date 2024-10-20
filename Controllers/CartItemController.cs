@@ -99,7 +99,7 @@ namespace shopWebAPI.Controllers
 		}
 
 
-		[Obsolete("Use PostCartItem instead,its using Upseart")]
+		[Obsolete("Use PostCartItem instead,its using Upseart, Unless you are using this for specific reason")]
 		[HttpPut("PutCartItem")]
 		public async Task<IActionResult> PutCartItem([FromBody] CartItem cartItem)
 		{
@@ -112,6 +112,36 @@ namespace shopWebAPI.Controllers
 				Response = Convert.ToString(res)??"0"
 			}): NotFound();
 		}
+
+		[HttpDelete("DeleteCartItem/{productId}")]
+		public async Task<IActionResult> DeleteCartItem(int productId)
+		{
+            var user = GetThisUser();
+
+            if (user == null) return Unauthorized();
+
+            var res = await _serviceCartItem.DeleteProduct(productId,user.Id);
+			
+			return res is not null? Ok(new AbstractResponse
+			{
+				Response = Convert.ToString(res)??"0"
+			}): NotFound();
+		}
+
+		[HttpPut("PutCartItem/{productId}/{quantity}/{isIncrement}")]
+		public async Task<IActionResult> UpdateCartItem(int productId,int quantity,bool isIncrement)
+		{
+			var user = GetThisUser();
+
+			if (user == null) return Unauthorized();
+
+			var res = await _serviceCartItem.UpdateProduct(user.Id,productId,quantity,isIncrement);
+
+            return res is not null ? Ok(new AbstractResponse
+            {
+                Response = Convert.ToString(res) ?? "0"
+            }) : NotFound();
+        }
 		private User? GetThisUser()
 		{
 			var auth = Request.Headers["Authorization"];

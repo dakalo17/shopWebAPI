@@ -3,6 +3,7 @@ using shopWebAPI.Models;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection.PortableExecutable;
+using System.Transactions;
 
 namespace shopWebAPI.Data
 {
@@ -123,12 +124,14 @@ namespace shopWebAPI.Data
                 const string selectCartId = @"
 							select id
 							from ""order""
-							where fk_user_id = @userId;
+							where fk_user_id = @userId
+							and status = @status;
 							";
 
 				await using var cmdSelectCart = new NpgsqlCommand(selectCartId,_connection,transaction);
 
 				cmdSelectCart.Parameters.AddWithValue("@userId", userId);
+				cmdSelectCart.Parameters.AddWithValue("@status", 1);
 
 				await using var readerCart = await cmdSelectCart.ExecuteReaderAsync();
 
@@ -159,7 +162,7 @@ namespace shopWebAPI.Data
 					from ""order_product"" 
 					inner join ""product"" p on 
 					""order_product"".fk_product_id = p.id 
-                    where  ""order_product"".status= @status and ""order_product"".fk_order_id = @orderId 
+                    where  ""order_product"".status= @status and ""order_product"".fk_order_id = @orderId
                     order by ""order_product"".fk_order_id";
 
 
@@ -297,8 +300,8 @@ namespace shopWebAPI.Data
 				transaction = await _connection.BeginTransactionAsync();
 
 				Cart? order = null;
-				const string selectCartQuery = "SELECT * FROM \"order\" " +
-				"WHERE fk_user_id=@userId";
+				const string selectCartQuery = "SELECT * FROM \"order\" WHERE fk_user_id=@userId";
+
 				//retreave cart(s) of user
 				using (var cmd = new NpgsqlCommand(selectCartQuery, _connection))
 				{
@@ -459,20 +462,36 @@ namespace shopWebAPI.Data
 					{
 						await result.CloseAsync();
 					}
+
+					bool isDelete = false;
 					//if a duplicate exists (product in a x cart) -> update quantity
 					if (ucheck > 0)
 					{
 						
-						string sqlUpdate = "";
+						string sqlUpdateOrDelete = "";
 						//if its to not increment the quantity amount
                         if (isUpdate) {
-                            sqlUpdate = $@"update ""order_product"" SET
+							//if its an update but not equal to 0
+							if (op.Quantity != 0)
+							{
+                                sqlUpdateOrDelete = $@"update ""order_product"" SET
 										quantity =  @addQuant
 										where fk_order_id = @fk_order_id and fk_product_id = @fk_product_id";
+							}
+							else
+							{
+                                sqlUpdateOrDelete = $@"
+											delete from ""order_product""
+											where ""order_product"".fk_product_id =@fk_product_id and ""order_product"".fk_order_id =@fk_order_id;
+										";
+								isDelete = true;
+                            }
+
+							
 						}
 						else
 						{
-                            sqlUpdate = $@"update ""order_product"" SET
+                            sqlUpdateOrDelete = $@"update ""order_product"" SET
 										quantity = quantity + @addQuant
 										where fk_order_id = @fk_order_id and fk_product_id = @fk_product_id";
                         }
@@ -480,16 +499,18 @@ namespace shopWebAPI.Data
 
 						
 
-						await using var cmdUpdate = new NpgsqlCommand(sqlUpdate,_connection);
+						await using var cmdUpdate = new NpgsqlCommand(sqlUpdateOrDelete, _connection);
 						cmdUpdate.Transaction = transaction;
 
 
                         cmdUpdate.Parameters.AddWithValue("@fk_product_id", op.Fk_Product_Id);
                         cmdUpdate.Parameters.AddWithValue("@fk_order_id", op.Fk_Order_Id);
-                        cmdUpdate.Parameters.AddWithValue("@addQuant", op.Quantity);
+						//to exclude the addQty param if its delete command
+						if(!isDelete)
+							cmdUpdate.Parameters.AddWithValue("@addQuant", op.Quantity);
 
                         if (await cmdUpdate.ExecuteNonQueryAsync() <= 0) 
-							throw new Exception("Could not update quantity of the cart item");
+							throw new Exception($"Could not { (isDelete? "delete" : "update the quantity of ") }the cart item");
 
 						// upserting section
 
@@ -517,24 +538,6 @@ namespace shopWebAPI.Data
                             throw new Exception("Could not insert the cart item");
                     }
 
-
-                    //               op.Fk_Order_Id = int.Max(op.Fk_Order_Id, getorderId);
-                    //               await using var cmd = new NpgsqlCommand(updateProductCart, _connection);
-
-                    //               cmd.Transaction = transaction;
-                    //               cmd.Parameters.AddWithValue("@quantity", op.Quantity);
-                    //cmd.Parameters.AddWithValue("@productId", op.Fk_Product_Id);
-                    //cmd.Parameters.AddWithValue("@orderId", op.Fk_Order_Id);
-                    //cmd.Parameters.AddWithValue("@price", op.Price);
-                    //cmd.Parameters.AddWithValue("@status", 1);
-
-
-
-
-                    //affectedRows = await cmd.ExecuteNonQueryAsync();
-					
-
-					
 					
                     const string sql1 = "SELECT * FROM \"product\" " +
                         "WHERE id=@id;";
@@ -663,5 +666,187 @@ namespace shopWebAPI.Data
 
 			return affectedRows;
 		}
-	}
+
+        public async Task<int?> DeleteProduct(int productId, int userId)
+        {
+
+            var affectedRows = 0;
+			NpgsqlTransaction? transaction = null;
+            try
+            {
+				await _connection.OpenAsync();
+				transaction = await _connection.BeginTransactionAsync();
+
+                Cart? order = null;
+                const string selectCartQuery = "SELECT * FROM \"order\" WHERE fk_user_id=@userId";
+                //retreave cart(s) of user
+                using (var cmd1 = new NpgsqlCommand(selectCartQuery, _connection))
+                {
+
+                    cmd1.Transaction = transaction;
+                    cmd1.Parameters.AddWithValue("@userId", userId);
+
+                    await using var reader = await cmd1.ExecuteReaderAsync();
+
+
+					if (await reader.ReadAsync() && reader.HasRows)
+					{
+						order = new Cart
+						{
+							Id = Convert.ToInt32(reader["id"])
+							//Fk_User_Id = Convert.ToInt32(reader["fk_user_id"]),
+							//Order_Date = Convert.ToDateTime(reader["order_date"]),
+							//Total_Cost = Convert.ToDecimal(reader["total_cost"]),
+							//Status = Convert.ToInt32(reader["status"]),
+						};
+					}
+					else throw new Exception($"Cart for -{userId}- not found");
+
+
+                }
+
+                //------
+                const string deleteProductCart = $@"delete from ""order_product""
+				                                    where	order_product.fk_product_id =@fk_product_id and 
+				order_product.fk_order_id =@fk_order_id; ";
+
+				//const string deleteProductCart = $@"
+				//		update ""order_product""
+				//		set status = @status
+				//		where order_product.fk_product_id and 
+				//				order_product.fk_order_id =@fk_order_id;
+				//";
+
+
+                using var cmd = new NpgsqlCommand(deleteProductCart, _connection);
+
+				cmd.Transaction = transaction;
+                cmd.Parameters.AddWithValue("@fk_product_id", productId);
+                //cmd.Parameters.AddWithValue("@status", 0);
+                cmd.Parameters.AddWithValue("@fk_order_id", order.Id);
+
+                affectedRows = await cmd.ExecuteNonQueryAsync();
+
+
+				await transaction.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                ex.GetBaseException();
+				
+				if(transaction is not null)
+				{
+					transaction.Rollback();
+				}
+                return null;
+            }
+            finally
+            {
+
+
+                await _connection.CloseAsync();
+            }
+
+            return affectedRows;
+        }
+
+		public async Task<int?> UpdateProduct(int userId, int productId, int quantity, bool isIncrement)
+		{
+			{
+
+				var affectedRows = 0;
+				NpgsqlTransaction? transaction = null;
+				try
+				{
+					await _connection.OpenAsync();
+					transaction = await _connection.BeginTransactionAsync();
+
+					Cart? order = null;
+					const string selectCartQuery = "SELECT * FROM \"order\" WHERE fk_user_id=@userId";
+					//retreave cart(s) of user
+					using (var cmd1 = new NpgsqlCommand(selectCartQuery, _connection))
+					{
+
+						cmd1.Transaction = transaction;
+						cmd1.Parameters.AddWithValue("@userId", userId);
+
+						await using var reader = await cmd1.ExecuteReaderAsync();
+
+						//get the single active cart
+						if (await reader.ReadAsync() && reader.HasRows)
+						{
+							order = new Cart
+							{
+								Id = Convert.ToInt32(reader["id"])
+							};
+						}
+						else throw new Exception($"Cart for -{userId}- not found");
+
+
+					}
+
+					//------
+
+
+					string sqlUpdateOrDelete = "";
+					//if its to not increment the quantity amount
+					if (!isIncrement)
+					{
+						//if its an update but not equal to 0
+
+						sqlUpdateOrDelete = $@"
+												update ""order_product"" 
+												SET	quantity =  @addQuant
+												where	fk_order_id = @fk_order_id and
+														fk_product_id = @fk_product_id";
+
+					}
+					else
+					{
+						sqlUpdateOrDelete = $@"update ""order_product"" SET
+									quantity = quantity + @addQuant
+									where fk_order_id = @fk_order_id and fk_product_id = @fk_product_id";
+					}
+
+
+
+
+					await using var cmdUpdate = new NpgsqlCommand(sqlUpdateOrDelete, _connection);
+					cmdUpdate.Transaction = transaction;
+
+
+					cmdUpdate.Parameters.AddWithValue("@fk_product_id", productId);
+					cmdUpdate.Parameters.AddWithValue("@fk_order_id", order.Id);
+					//to exclude the addQty param if its delete command
+					cmdUpdate.Parameters.AddWithValue("@addQuant", quantity);
+					affectedRows = await cmdUpdate.ExecuteNonQueryAsync();
+					if (affectedRows <= 0)
+						throw new Exception("Could not update the quantity of the cart item");
+
+
+
+
+					await transaction.CommitAsync();
+				}
+				catch (Exception ex)
+				{
+					ex.GetBaseException();
+
+					if (transaction is not null)
+					{
+						transaction.Rollback();
+					}
+					return null;
+				}
+				finally
+				{
+
+
+					await _connection.CloseAsync();
+				}
+
+				return affectedRows;
+			}
+		}
+    }
 }

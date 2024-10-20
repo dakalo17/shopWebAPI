@@ -5,14 +5,24 @@ using Microsoft.OpenApi.Models;
 using shopWebAPI.Data;
 using shopWebAPI.Models.Jwt;
 using shopWebAPI.Repository.Jwt;
+using shopWebAPI.Utilities;
 using System.ComponentModel;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+//builder.WebHost.ConfigureKestrel(serverOptions =>
+//{
+//    serverOptions.ListenAnyIP(7159);
+    
+//});
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+   
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(x=>
@@ -46,7 +56,17 @@ builder.Services.AddSwaggerGen(x=>
   });
 });
 
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        builder =>
+        {
+            builder
+            .AllowAnyHeader()
+            .AllowAnyOrigin()
+            .AllowAnyMethod();
+        });
+});
     
 
 
@@ -80,6 +100,7 @@ builder.Services.AddSingleton<IUserRefreshTokenRepository, UserRefreshTokenRepos
 
 
 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -89,6 +110,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();
 
